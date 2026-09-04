@@ -2,7 +2,6 @@ import { spawn } from "node:child_process";
 import { mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
-import ffmpegInstaller from "@ffmpeg-installer/ffmpeg";
 import {
   canAutoPlayReplay,
   deriveReplayFrames,
@@ -287,13 +286,45 @@ function concatPath(filePath: string): string {
   return filePath.replaceAll("\\", "/").replaceAll("'", "'\\''");
 }
 
+let ffmpegExecutablePromise: Promise<string> | undefined;
+
+async function executableWorks(executable: string): Promise<boolean> {
+  return new Promise<boolean>((resolve) => {
+    const child = spawn(executable, ["-version"], { stdio: "ignore", windowsHide: true });
+    const timeout = setTimeout(() => { child.kill(); resolve(false); }, 5_000);
+    child.once("error", () => { clearTimeout(timeout); resolve(false); });
+    child.once("exit", (code) => { clearTimeout(timeout); resolve(code === 0); });
+  });
+}
+
+async function resolveFfmpegExecutable(): Promise<string> {
+  if (!ffmpegExecutablePromise) {
+    ffmpegExecutablePromise = (async () => {
+      const candidates = [process.env.AGENTJOURNEY_FFMPEG_EXECUTABLE, "ffmpeg"]
+        .filter((value): value is string => Boolean(value));
+      try {
+        const installer = await import("@ffmpeg-installer/ffmpeg");
+        if (installer.default.path) candidates.push(installer.default.path);
+      } catch {
+        // The optional package is not required for archive and review features.
+      }
+      for (const candidate of [...new Set(candidates)]) {
+        if (await executableWorks(candidate)) return candidate;
+      }
+      throw new Error("MP4 export requires FFmpeg. Install ffmpeg on PATH or set AGENTJOURNEY_FFMPEG_EXECUTABLE.");
+    })();
+  }
+  return ffmpegExecutablePromise;
+}
+
 async function runFfmpeg(
   args: string[],
   durationMs: number,
   onProgress: (percent: number) => void
 ): Promise<void> {
+  const executable = await resolveFfmpegExecutable();
   await new Promise<void>((resolve, reject) => {
-    const child = spawn(ffmpegInstaller.path, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
+    const child = spawn(executable, args, { stdio: ["ignore", "ignore", "pipe"], windowsHide: true });
     let stderr = "";
     let pending = "";
     child.stderr.setEncoding("utf8");

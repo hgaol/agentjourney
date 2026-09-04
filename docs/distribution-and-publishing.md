@@ -4,7 +4,31 @@
 
 AgentJourney currently runs from a pnpm workspace with `pnpm dev`. This document defines the path to a single public npm package that can be tried with `npx`, installed globally for regular use, and published through a provenance-producing release workflow.
 
-This document is an implementation and release guide, not a statement that a package has already been published. [ADR 0045](adr/0045-run-from-source-with-pnpm-for-now.md) remains the current decision until the distribution work is completed and a replacement ADR is accepted.
+This document is an implementation and release guide, not a statement that a package has already been published. The package implementation and local tarball verification now exist, but public release remains blocked on the owner actions below. [ADR 0045](adr/0045-run-from-source-with-pnpm-for-now.md) remains the current user-facing decision until the first release is published and a replacement ADR is accepted.
+
+Implemented on 2026-09-04:
+
+- publishable `apps/distribution` package and `agentjourney` binary;
+- extracted `startAgentJourney()` host interface;
+- one-process Fastify API and production SPA serving;
+- loopback bootstrap, browser opening, port reuse, and signal shutdown;
+- private workspace bundling with lazy host initialization;
+- optional FFmpeg resolution that prefers system/configured FFmpeg and does not block startup;
+- package file/size/dependency verification;
+- `npm pack`, clean install without optional dependencies, `npx`, production SPA, QuickJS, persistence, and SBOM smoke checks;
+- Linux/macOS/Windows package CI matrix and protected OIDC publish workflow.
+
+Run the complete local artifact gate with:
+
+```bash
+pnpm release:verify
+```
+
+`release:verify` deliberately uses `AGENTJOURNEY_ALLOW_PRIVATE_PACK=1` only around local `npm pack`. The publish workflow uses `release:check` plus release-mode `release:pack`, so it cannot publish while `private: true` remains.
+
+Owner-controlled release acknowledgements live in `apps/distribution/release-approvals.json`. They default to `false`; do not change them until npm package ownership and the FFmpeg distribution decision are actually confirmed. The distribution package also remains `private: true` and `UNLICENSED` as a fail-closed publication guard. `pnpm release:check` requires the owner gates, license, canonical Git metadata, and an explicit switch to `private: false`.
+
+The generated alpha tarball is approximately 382 KiB packed and 1.41 MiB unpacked, excluding installed runtime dependencies.
 
 ## Distribution decision
 
@@ -43,7 +67,7 @@ Node.js remains an external prerequisite for the npm distribution. Keep the exis
 
 ### One public package
 
-Add a dedicated publishable workspace, for example:
+The dedicated publishable workspace is:
 
 ```text
 apps/distribution/
@@ -101,7 +125,7 @@ The final decision must be proven by installing the packed tarball into an empty
 
 ### Extract startup from the executable module
 
-`apps/host/src/main.ts` currently creates dependencies and starts listening at module evaluation time. Extract a callable module such as:
+`apps/host/src/runtime.ts` now exposes the callable startup interface used by both source development and the packaged CLI:
 
 ```ts
 interface StartAgentJourneyOptions {
@@ -162,7 +186,7 @@ Options:
 
 Recommended behavior:
 
-- Reject invalid ports and relative ambiguity in `--data-dir`.
+- Reject invalid ports; resolve `--data-dir` against the caller's working directory, expand `~`, and print the resulting absolute path.
 - Create the data directory with restrictive permissions where supported.
 - If the configured port belongs to a compatible AgentJourney process, open that instance instead of starting a duplicate.
 - If another application owns the port, report a clear error and suggest `--port`.
@@ -233,27 +257,29 @@ A project `LICENSE` file is currently absent. Choosing and adding the AgentJourn
 
 Generate and review `THIRD_PARTY_NOTICES.md` and a machine-readable software bill of materials for every release artifact. Pay particular attention to runtime binaries and code copied into the Web bundle.
 
-The current FFmpeg dependency needs an explicit distribution decision:
+The current FFmpeg dependency still needs an owner licensing/platform decision:
 
 - `@ffmpeg-installer/ffmpeg@1.1.0` selects platform packages through optional dependencies;
 - its Linux x64 package identifies a 2018 FFmpeg build and declares GPLv3;
-- the available package matrix does not include native Windows arm64;
-- a static top-level import may prevent the rest of AgentJourney from starting on an unsupported platform.
+- the available package matrix does not include native Windows arm64.
 
-Before public release, either replace this dependency with a maintained and legally reviewed strategy or make MP4 a capability that can be unavailable without preventing archive/review startup. Prefer system FFmpeg discovery plus a clear diagnostic; dynamically load the fallback implementation only when an export is requested.
+The technical startup gap is closed: FFmpeg is now an optional dependency, is dynamically resolved only for MP4 export, prefers `AGENTJOURNEY_FFMPEG_EXECUTABLE` and system `ffmpeg`, and can be absent without preventing archive/review startup. The clean package smoke deliberately omits optional dependencies. Before public release, the owner must still approve this fallback's license/age/platform policy or request its removal/replacement.
 
 `playwright-core` does not provide a browser installation by itself. The npm install must not silently download a browser. MP4 export should continue to discover installed Chromium, Chrome, or Edge and explain the optional Playwright browser-install command when none is available.
 
-QuickJS depends on separately packaged WASM artifacts. Tarball smoke tests must exercise both Renderer and Source Adapter sandbox startup to prove those files resolve after npm installation.
+QuickJS depends on separately packaged WASM artifacts. The tarball smoke installs and executes both a Renderer and Source Adapter through the packaged HTTP interfaces to prove those files resolve after npm installation.
 
 Astryx and other Web dependencies should be compiled into static Web assets during release. They should not become runtime dependencies of the public CLI merely because the monorepo Web workspace uses them at build time.
 
 ## Build pipeline
 
-Add one deterministic command, for example:
+The deterministic artifact commands are:
 
 ```bash
-pnpm release:pack
+pnpm release:pack:local # build and pack while the publication guard is private
+pnpm release:smoke      # install and exercise the latest tarball
+pnpm release:verify     # run both local artifact gates
+pnpm release:pack       # release-mode pack; refuses while private=true
 ```
 
 It should:
@@ -295,7 +321,7 @@ Automate assertions over the JSON file list and unpacked tarball:
 - package and unpacked sizes stay under recorded budgets;
 - the package version equals the Git tag.
 
-A clean-install smoke test should use the tarball, not the repository:
+The implemented clean-install smoke uses the tarball, not workspace packages:
 
 ```bash
 mkdir /tmp/agentjourney-smoke
@@ -306,7 +332,7 @@ npx agentjourney --version
 npx agentjourney --no-open --data-dir ./data --port 4318
 ```
 
-Drive startup/health/shutdown with a cross-platform Node test rather than POSIX-only shell process management. The test should verify:
+`scripts/smoke-package.mjs` drives startup/health/shutdown with Node rather than POSIX-only shell process management. It verifies:
 
 - `/api/v1/health` becomes ready;
 - the production SPA and hashed assets load from the host;
@@ -428,8 +454,11 @@ jobs:
             echo "tag=latest" >> "$GITHUB_OUTPUT"
           fi
 
-      - name: Publish with OIDC
-        run: npm publish ./apps/distribution --access public --tag "${{ steps.release.outputs.tag }}"
+      - name: Publish verified tarball with OIDC
+        shell: bash
+        run: |
+          TARBALL=$(node -p "require('./release/pack-manifest.json').filename")
+          npm publish "./release/$TARBALL" --access public --tag "${{ steps.release.outputs.tag }}"
 ```
 
 Trusted Publishing automatically produces provenance for supported GitHub-hosted workflows. If a token-based transitional workflow is used instead, add `--provenance` and ensure the package's case-sensitive `repository` metadata matches the build repository.
@@ -592,17 +621,17 @@ The npm registry, GitHub Releases, Sigstore, and transparency logs necessarily r
 
 Do not publish the first public alpha until all of these are resolved:
 
-- [ ] AgentJourney project license selected and committed
+- [ ] AgentJourney project license selected and committed; distribution package switched from `private: true`/`UNLICENSED` only after approval
 - [ ] Canonical Git remote configured
-- [ ] `agentjourney` npm name ownership confirmed
-- [ ] Private workspace imports bundled out of the artifact
-- [ ] Production Web UI served without Vite
-- [ ] Clean tarball install starts on Linux, macOS, and Windows
-- [ ] QuickJS/WASM works from the packed installation
-- [ ] FFmpeg licensing, age, optionality, and platform coverage reviewed
-- [ ] Package file allowlist and secret scan pass
-- [ ] Local auth and loopback-only binding pass from the package
-- [ ] Archive survives reinstall and upgrade
+- [ ] `agentjourney` npm name ownership confirmed in `release-approvals.json`
+- [x] Private workspace imports bundled out of the artifact
+- [x] Production Web UI served without Vite
+- [ ] Clean tarball install starts on Linux, macOS, and Windows (Linux passes locally; the three-OS CI gate is configured but has not yet run remotely)
+- [x] QuickJS/WASM is exercised from a packed clean installation
+- [ ] FFmpeg licensing, age, and platform coverage reviewed by the owner and approved in `release-approvals.json` (technical optionality and system fallback are implemented)
+- [x] Package file allowlist, dependency declaration, size, and sensitive-file checks pass
+- [x] Local auth and loopback-only binding pass from the package
+- [x] Journey and plugin data survive packaged-process restart
 - [ ] Alpha publishes under `next`, not `latest`
 
 ## Primary references

@@ -1,5 +1,5 @@
 {
-  "name": "agentjourney",
+  "name": "agentjourney-workspace",
   "version": "0.0.0",
   "private": true,
   "type": "module",
@@ -8,7 +8,7 @@
     "node": ">=22.19.0"
   },
   "scripts": {
-    "build": "pnpm generate && pnpm --filter @agentjourney/web build && pnpm --filter @agentjourney/host build",
+    "build": "pnpm generate && pnpm --filter @agentjourney/web build && pnpm --filter @agentjourney/host build && pnpm --filter agentjourney build",
     "check:local-adapters": "tsx scripts/check-local-adapters.ts",
     "dev": "concurrently -k -n host,web -c blue,magenta \"pnpm --filter @agentjourney/host dev\" \"pnpm --filter @agentjourney/web dev\"",
     "e2e": "playwright test",
@@ -17,6 +17,11 @@
     "plugin:create": "tsx scripts/create-plugin.ts",
     "plugin:pack": "tsx scripts/pack-plugin.ts",
     "plugin:check": "tsx scripts/check-plugin.ts",
+    "release:check": "node scripts/check-release-ready.mjs",
+    "release:pack": "pnpm build && node scripts/pack-release.mjs",
+    "release:pack:local": "pnpm build && cross-env AGENTJOURNEY_ALLOW_PRIVATE_PACK=1 node scripts/pack-release.mjs",
+    "release:smoke": "node scripts/smoke-package.mjs",
+    "release:verify": "pnpm release:pack:local && pnpm release:smoke",
     "test": "vitest run",
     "test:watch": "vitest",
     "typecheck": "pnpm generate && tsc --noEmit -p tsconfig.json && tsc --noEmit -p apps/web/tsconfig.json"
@@ -31,6 +36,7 @@
     "@playwright/test": "^1.58.2",
     "@types/node": "^22.20.1",
     "concurrently": "^10.0.5",
+    "cross-env": "^10.1.0",
     "tsx": "^4.23.13",
     "typescript": "^5.9.3",
     "vitest": "^3.2.7"

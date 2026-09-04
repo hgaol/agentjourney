@@ -1,0 +1,57 @@
+{
+  "name": "agentjourney",
+  "version": "0.1.0-alpha.1",
+  "private": true,
+  "description": "Local-first forensic review and replay for coding-agent histories",
+  "license": "UNLICENSED",
+  "type": "module",
+  "bin": {
+    "agentjourney": "dist/cli.js"
+  },
+  "files": [
+    "dist/**",
+    "README.md",
+    "CHANGELOG.md",
+    "THIRD_PARTY_NOTICES.md"
+  ],
+  "engines": {
+    "node": ">=22.19.0"
+  },
+  "keywords": [
+    "coding-agent",
+    "claude-code",
+    "codex",
+    "copilot",
+    "pi",
+    "replay",
+    "local-first"
+  ],
+  "publishConfig": {
+    "access": "public"
+  },
+  "scripts": {
+    "build": "tsup src/cli.ts --format esm --platform node --target node22 --out-dir dist --clean --external @ffmpeg-installer/ffmpeg && node scripts/stage-assets.mjs && node scripts/verify-package.mjs",
+    "prepack": "pnpm build",
+    "typecheck": "tsc --noEmit -p ../../tsconfig.json"
+  },
+  "dependencies": {
+    "@fastify/cookie": "11.1.2",
+    "@fastify/static": "10.1.3",
+    "ajv": "8.20.0",
+    "ajv-formats": "3.0.1",
+    "fastify": "5.12.1",
+    "fflate": "0.8.3",
+    "open": "11.0.2",
+    "picomatch": "4.0.7",
+    "playwright-core": "1.62.1",
+    "quickjs-emscripten": "0.32.0",
+    "semver": "7.8.5",
+    "yaml": "2.9.0"
+  },
+  "optionalDependencies": {
+    "@ffmpeg-installer/ffmpeg": "1.1.0"
+  },
+  "devDependencies": {
+    "tsup": "8.5.1"
+  }
+}

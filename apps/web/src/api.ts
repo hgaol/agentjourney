@@ -22,7 +22,7 @@ export function localHostUrl(): string {
   const configured = import.meta.env.VITE_AGENTJOURNEY_HOST_ORIGIN as string | undefined;
   if (configured) return new URL("/", configured).toString();
   const host = new URL(window.location.href);
-  host.port = "4317";
+  if (import.meta.env.DEV) host.port = "4317";
   host.pathname = "/";
   host.search = "";
   host.hash = "";
@@ -34,7 +34,9 @@ function redirectThroughHost(): Promise<never> {
     throw new Error("Local authorization redirect did not complete. Ensure the host is running and open its URL.");
   }
   window.sessionStorage.setItem(AUTH_REDIRECT_KEY, "pending");
-  window.location.replace(localHostUrl());
+  const host = new URL(localHostUrl());
+  host.searchParams.set("returnTo", `${window.location.pathname}${window.location.search}${window.location.hash}`);
+  window.location.replace(host);
   return new Promise<never>(() => {});
 }
 

@@ -6,7 +6,7 @@ It passively scans approved history locations or imports selected native files. 
 
 ## Development
 
-Requirements: Node.js 22.19+ and pnpm 10+. Local MP4 export uses Playwright Chromium, installed Google Chrome or Microsoft Edge, or optional Safari-compatible Playwright WebKit; the platform FFmpeg encoder is installed with the host dependencies.
+Requirements: Node.js 22.19+ and pnpm 10+. Local MP4 export uses Playwright Chromium, installed Google Chrome or Microsoft Edge, or optional Safari-compatible Playwright WebKit. FFmpeg is resolved from `AGENTJOURNEY_FFMPEG_EXECUTABLE`, the system `PATH`, or the optional installer dependency; missing FFmpeg does not prevent archive and review startup.
 
 ```bash
 pnpm install
@@ -28,6 +28,18 @@ pnpm check:local-adapters  # reads recent local histories; uploads nothing
 ```
 
 By default data is stored under `~/.agentjourney`. Override it with `AGENTJOURNEY_DATA_DIR=/path`.
+
+## Distribution artifact
+
+The repository can build and exercise the single-package npm alpha locally:
+
+```bash
+pnpm release:verify
+```
+
+This creates an ignored tarball and CycloneDX SBOM under `release/`, installs the tarball without optional dependencies, invokes its `npx` binary, serves the embedded production SPA, exercises QuickJS Renderer and Source Adapter plugins, and verifies persistence across restart, uninstall, and reinstall. Public npm publication remains blocked until the project license, canonical Git repository, npm package ownership, and FFmpeg distribution approval are supplied.
+
+See [Distribution and publishing](docs/distribution-and-publishing.md).
 
 ## Capture
 
@@ -88,6 +100,7 @@ See [Archive and package format](docs/archive-format.md).
 
 ```text
 apps/host                    local host module and loopback interface
+apps/distribution            single-package CLI, production Web assets, and npm metadata
 apps/web                     React Platform Shell and Journey Stage host
 packages/activity-graph      partial ordering, Turns, Replay frames, comparisons
 packages/archive             deep archive, search, lifecycle, and package module
@@ -108,6 +121,7 @@ packages/test-fixtures       sanitized native-history fixtures
 - [Completed implementation plan](docs/implementation-plan.md)
 - [Plugin authoring](docs/plugins.md)
 - [Archive and package format](docs/archive-format.md)
+- [Distribution and publishing](docs/distribution-and-publishing.md)
 - [Domain language](CONTEXT.md)
 - [Architecture decisions](docs/adr/)
 - [Landscape research](docs/research/coding-agent-session-viewers.md)

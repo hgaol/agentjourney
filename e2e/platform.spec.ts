@@ -30,6 +30,13 @@ test("opening the Vite URL directly completes local authorization", async ({ bro
   await expect(page.getByRole("heading", { name: "Revisit how the work unfolded." })).toBeVisible({ timeout: 15_000 });
   expect(consoleErrors.filter((message) => !message.includes("401 (Unauthorized)"))).toEqual([]);
   await context.close();
+
+  const deepContext = await browser.newContext();
+  const deepPage = await deepContext.newPage();
+  await deepPage.goto("http://127.0.0.1:5173/settings");
+  await expect(deepPage.getByRole("heading", { name: "Archive operations" })).toBeVisible({ timeout: 15_000 });
+  expect(new URL(deepPage.url()).pathname).toBe("/settings");
+  await deepContext.close();
 });
 
 test("reviews and re-renders a captured Journey", async ({ page }) => {

@@ -1,5 +1,7 @@
 import { randomUUID } from "node:crypto";
+import path from "node:path";
 import Fastify, { type FastifyInstance } from "fastify";
+import fastifyStatic from "@fastify/static";
 import { unzipSync } from "fflate";
 import { compareInterpretations } from "@agentjourney/activity-graph";
 import type { JourneyArchive, ReviewOverlayUpdate, SearchOptions } from "@agentjourney/archive";
@@ -27,11 +29,33 @@ export interface ServerDependencies {
   automaticScanner?: AutomaticScanner;
   pluginRegistry?: PluginRegistry;
   videoExporter?: ReplayVideoExporter;
+  webDirectory?: string;
+  version?: string;
   logger?: boolean;
 }
 
 function errorMessage(error: unknown): string {
   return error instanceof Error ? error.message : "unknown error";
+}
+
+function safeReturnPath(value: unknown): string {
+  if (typeof value !== "string" || !value.startsWith("/") || value.startsWith("//")) return "/";
+  try {
+    const parsed = new URL(value, "http://agentjourney.local");
+    return parsed.origin === "http://agentjourney.local"
+      ? `${parsed.pathname}${parsed.search}${parsed.hash}`
+      : "/";
+  } catch {
+    return "/";
+  }
+}
+
+function bootstrapLocation(base: string, returnTo: unknown, secret: string): string {
+  const target = new URL(safeReturnPath(returnTo), base);
+  target.searchParams.set("token", secret);
+  return base === "http://agentjourney.local"
+    ? `${target.pathname}${target.search}${target.hash}`
+    : target.toString();
 }
 
 function assertRendererTreeBudget(value: unknown): void {
@@ -83,7 +107,7 @@ export async function createServer(dependencies: ServerDependencies): Promise<Fa
   }
   await dependencies.auth.register(app);
 
-  app.get("/api/v1/health", async () => ({ status: "ok", version: "0.0.0" }));
+  app.get("/api/v1/health", async () => ({ product: "agentjourney", status: "ok", version: dependencies.version ?? "0.0.0" }));
   app.get("/api/v1/sources", async () => dependencies.coordinator.listSources());
 
   app.post("/api/v1/sources/:sourceAgent/approve", async (request, reply) => {
@@ -474,10 +498,42 @@ export async function createServer(dependencies: ServerDependencies): Promise<Fa
     dependencies.events.attach(reply);
   });
 
-  app.get("/", async (_request, reply) => {
-    const webOrigin = process.env.AGENTJOURNEY_WEB_ORIGIN ?? "http://127.0.0.1:5173";
-    return reply.redirect(`${webOrigin}/?token=${encodeURIComponent(dependencies.auth.installationSecret)}`);
-  });
+  if (dependencies.webDirectory) {
+    await app.register(fastifyStatic, {
+      root: dependencies.webDirectory,
+      prefix: "/",
+      index: false,
+      redirect: false,
+      maxAge: "1y",
+      immutable: true
+    });
+    app.get("/", async (request, reply) => {
+      const query = request.query as { token?: string; returnTo?: string };
+      if (!query.token) {
+        return reply.redirect(bootstrapLocation(
+          "http://agentjourney.local",
+          query.returnTo,
+          dependencies.auth.installationSecret
+        ));
+      }
+      return reply.sendFile("index.html", { maxAge: 0, immutable: false });
+    });
+    app.setNotFoundHandler(async (request, reply) => {
+      const pathName = request.url.split("?")[0] ?? "/";
+      const isSpaNavigation = ["GET", "HEAD"].includes(request.method)
+        && !pathName.startsWith("/api/")
+        && path.posix.extname(pathName) === "";
+      return isSpaNavigation
+        ? reply.sendFile("index.html", { maxAge: 0, immutable: false })
+        : reply.code(404).send({ error: "not_found" });
+    });
+  } else {
+    app.get("/", async (request, reply) => {
+      const webOrigin = process.env.AGENTJOURNEY_WEB_ORIGIN ?? "http://127.0.0.1:5173";
+      const query = request.query as { returnTo?: string };
+      return reply.redirect(bootstrapLocation(webOrigin, query.returnTo, dependencies.auth.installationSecret));
+    });
+  }
 
   return app;
 }

@@ -1,0 +1,91 @@
+name: Publish npm package
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: read
+  id-token: write
+
+concurrency:
+  group: npm-publish-${{ github.event.release.tag_name }}
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    if: startsWith(github.event.release.tag_name, 'v')
+    runs-on: ubuntu-latest
+    environment: npm
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: ${{ github.event.release.tag_name }}
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 10.33.4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+
+      - name: Install npm with Trusted Publishing support
+        run: npm install --global npm@^11.5.1
+
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm release:check
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm build
+      - run: pnpm exec playwright install --with-deps chromium
+      - run: pnpm e2e
+      - run: pnpm release:pack
+      - run: pnpm release:smoke
+        env:
+          AGENTJOURNEY_SMOKE_BROWSER: "1"
+
+      - name: Retain verified tarball and SBOM
+        uses: actions/upload-artifact@v4
+        with:
+          name: agentjourney-${{ github.event.release.tag_name }}
+          path: |
+            release/*.tgz
+            release/*.cdx.json
+            release/pack-manifest.json
+          if-no-files-found: error
+
+      - name: Select npm dist-tag
+        id: release
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./apps/distribution/package.json').version")
+          test "v$VERSION" = "${{ github.event.release.tag_name }}"
+          if [[ "$VERSION" == *-* ]]; then
+            echo "tag=next" >> "$GITHUB_OUTPUT"
+          else
+            echo "tag=latest" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Publish verified tarball with npm Trusted Publishing
+        shell: bash
+        run: |
+          TARBALL=$(node -p "require('./release/pack-manifest.json').filename")
+          npm publish "./release/$TARBALL" --access public --tag "${{ steps.release.outputs.tag }}"
+
+      - name: Verify published package and attestations
+        shell: bash
+        run: |
+          VERSION=$(node -p "require('./apps/distribution/package.json').version")
+          for attempt in {1..10}; do
+            npm view "agentjourney@$VERSION" version && break
+            test "$attempt" -lt 10
+            sleep 6
+          done
+          mkdir -p /tmp/agentjourney-published
+          cd /tmp/agentjourney-published
+          npm init -y
+          npm install "agentjourney@$VERSION" --ignore-scripts --omit=optional
+          test "$(npx --no-install agentjourney --version)" = "$VERSION"
+          npm audit signatures

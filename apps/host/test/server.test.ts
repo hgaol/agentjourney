@@ -1,4 +1,4 @@
-import { mkdtemp, readFile, rm } from "node:fs/promises";
+import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { zipSync } from "fflate";
 import os from "node:os";
 import path from "node:path";
@@ -206,6 +206,53 @@ describe("loopback host", () => {
     expect(rotated.statusCode).toBe(200);
     const oldSession = await app.inject({ method: "GET", url: "/api/v1/journeys", headers });
     expect(oldSession.statusCode).toBe(401);
+
+    await app.close();
+    archive.close();
+  });
+
+  it("serves the packaged SPA and preserves authenticated bootstrap", async () => {
+    const dataRoot = await mkdtemp(path.join(os.tmpdir(), "agentjourney-host-"));
+    temporaryRoots.push(dataRoot);
+    const webRoot = path.join(dataRoot, "web");
+    await mkdir(path.join(webRoot, "assets"), { recursive: true });
+    await writeFile(path.join(webRoot, "index.html"), "<!doctype html><title>Packaged AgentJourney</title><div id=\"root\"></div>");
+    await writeFile(path.join(webRoot, "assets", "app.js"), "globalThis.PACKAGED_AGENTJOURNEY=true;");
+    const archive = await SqliteJourneyArchive.open(path.join(dataRoot, "archive"));
+    const settings = new SettingsStore(path.join(dataRoot, "settings.json"));
+    await settings.load();
+    const auth = await LocalAuth.load(dataRoot);
+    const events = new EventHub();
+    const coordinator = new CaptureCoordinator(builtInAdapters, archive, settings, events);
+    const app = await createServer({ archive, settings, auth, events, coordinator, webDirectory: webRoot, logger: false });
+
+    const entry = await app.inject({ method: "GET", url: "/", headers: { host: "localhost" } });
+    expect(entry.statusCode).toBe(302);
+    expect(entry.headers.location).toBe(`/?token=${encodeURIComponent(auth.installationSecret)}`);
+    const deepEntry = await app.inject({
+      method: "GET",
+      url: `/?returnTo=${encodeURIComponent("/journeys/example?view=replay")}`,
+      headers: { host: "localhost" }
+    });
+    expect(deepEntry.headers.location).toBe(`/journeys/example?view=replay&token=${encodeURIComponent(auth.installationSecret)}`);
+    const rejectedReturn = await app.inject({
+      method: "GET",
+      url: `/?returnTo=${encodeURIComponent("//attacker.example/steal")}`,
+      headers: { host: "localhost" }
+    });
+    expect(rejectedReturn.headers.location).toBe(`/?token=${encodeURIComponent(auth.installationSecret)}`);
+    const bootstrappedEntry = await app.inject({ method: "GET", url: entry.headers.location!, headers: { host: "localhost" } });
+    expect(bootstrappedEntry.statusCode).toBe(200);
+    expect(bootstrappedEntry.body).toContain("Packaged AgentJourney");
+
+    const asset = await app.inject({ method: "GET", url: "/assets/app.js", headers: { host: "localhost" } });
+    expect(asset.statusCode).toBe(200);
+    expect(asset.body).toContain("PACKAGED_AGENTJOURNEY");
+    const spaRoute = await app.inject({ method: "GET", url: "/journeys/example", headers: { host: "localhost" } });
+    expect(spaRoute.statusCode).toBe(200);
+    expect(spaRoute.body).toContain("Packaged AgentJourney");
+    const missingApi = await app.inject({ method: "GET", url: "/api/v1/not-real", headers: { host: "localhost" } });
+    expect(missingApi.statusCode).toBe(401);
 
     await app.close();
     archive.close();
