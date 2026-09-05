@@ -39,7 +39,7 @@ const result = JSON.parse(packed.stdout)[0];
 if (!result?.filename || !Array.isArray(result.files)) throw new Error("npm pack returned an unexpected manifest");
 const paths = result.files.map((file) => file.path);
 const failures = [];
-for (const required of ["package.json", "README.md", "CHANGELOG.md", "THIRD_PARTY_NOTICES.md", "dist/cli.js", "dist/web/index.html"]) {
+for (const required of ["package.json", "README.md", "CHANGELOG.md", "LICENSE", "NOTICE", "THIRD_PARTY_NOTICES.md", "dist/cli.js", "dist/web/index.html"]) {
   if (!paths.includes(required)) failures.push(`missing ${required}`);
 }
 for (const file of paths) {

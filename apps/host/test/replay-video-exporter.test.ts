@@ -1,3 +1,4 @@
+import { spawnSync } from "node:child_process";
 import { describe, expect, it } from "vitest";
 import type { StageDocument } from "@agentjourney/contracts";
 import { rendererForSourceAgent } from "@agentjourney/builtin-renderers";
@@ -55,6 +56,9 @@ function stage(timed = true): StageDocument {
     presentation: { redacted: true, view: "review" }
   };
 }
+
+const ffmpegExecutable = process.env.AGENTJOURNEY_FFMPEG_EXECUTABLE ?? "ffmpeg";
+const systemFfmpegAvailable = spawnSync(ffmpegExecutable, ["-version"], { stdio: "ignore", windowsHide: true }).status === 0;
 
 const options = validateReplayVideoOptions({
   rendererId: "builtin.pi",
@@ -130,7 +134,7 @@ describe("Replay video export", () => {
     expect(planReplayVideo(stage(false), { speed: 1, streamMode: "simulated" }).frames.length).toBeGreaterThan(1);
   });
 
-  it("encodes a playable MP4 and reports rendering/encoding progress", async () => {
+  it.skipIf(!systemFfmpegAvailable)("encodes a playable MP4 and reports rendering/encoding progress", async () => {
     const progress: Array<{ phase: string; percent: number }> = [];
     const result = await new LocalReplayVideoExporter().exportReplay({
       stage: stage(),
@@ -148,4 +152,12 @@ describe("Replay video export", () => {
     expect(progress.some(({ phase, percent }) => phase === "encoding" && percent > 82)).toBe(true);
     expect(progress.at(-1)).toMatchObject({ phase: "completed", percent: 100 });
   }, 60_000);
+
+  it.skipIf(systemFfmpegAvailable)("reports the system FFmpeg requirement before rendering frames", async () => {
+    await expect(new LocalReplayVideoExporter().exportReplay({
+      stage: stage(),
+      renderer: rendererForSourceAgent("pi"),
+      options
+    })).rejects.toThrow(/Install ffmpeg on PATH|AGENTJOURNEY_FFMPEG_EXECUTABLE/u);
+  });
 });

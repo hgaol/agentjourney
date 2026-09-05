@@ -13,8 +13,13 @@ if (packageDocument.private === true) failures.push("set apps/distribution priva
 if (!packageDocument.license || packageDocument.license === "UNLICENSED") {
   failures.push("choose the AgentJourney project license and replace package license=UNLICENSED");
 }
-for (const licensePath of [path.join(workspaceRoot, "LICENSE"), path.join(packageRoot, "LICENSE")]) {
-  try { await access(licensePath); } catch { failures.push(`add ${path.relative(workspaceRoot, licensePath)}`); }
+for (const requiredPath of [
+  path.join(workspaceRoot, "LICENSE"),
+  path.join(workspaceRoot, "NOTICE"),
+  path.join(packageRoot, "LICENSE"),
+  path.join(packageRoot, "NOTICE")
+]) {
+  try { await access(requiredPath); } catch { failures.push(`add ${path.relative(workspaceRoot, requiredPath)}`); }
 }
 const repositoryUrl = typeof packageDocument.repository === "string"
   ? packageDocument.repository
@@ -31,7 +36,7 @@ if (releaseTag && releaseTag !== `v${packageDocument.version}`) {
   failures.push(`release tag ${releaseTag} does not match package version v${packageDocument.version}`);
 }
 if (approvals.npmPackageOwnershipConfirmed !== true) failures.push("confirm npm package ownership in apps/distribution/release-approvals.json");
-if (approvals.ffmpegDistributionApproved !== true) failures.push("approve or replace the optional FFmpeg distribution in apps/distribution/release-approvals.json");
+if (approvals.ffmpegDistributionApproved !== true) failures.push("confirm the system-only FFmpeg policy in apps/distribution/release-approvals.json");
 if (!String(packageDocument.version).includes("-") && packageDocument.version.startsWith("0.1.0")) {
   failures.push("publish at least one alpha/beta under the next dist-tag before the first stable version");
 }

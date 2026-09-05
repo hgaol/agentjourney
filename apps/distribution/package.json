@@ -3,7 +3,7 @@
   "version": "0.1.0-alpha.1",
   "private": true,
   "description": "Local-first forensic review and replay for coding-agent histories",
-  "license": "UNLICENSED",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "agentjourney": "dist/cli.js"
@@ -12,6 +12,8 @@
     "dist/**",
     "README.md",
     "CHANGELOG.md",
+    "LICENSE",
+    "NOTICE",
     "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
@@ -38,7 +40,7 @@
     "access": "public"
   },
   "scripts": {
-    "build": "tsup src/cli.ts --format esm --platform node --target node22 --out-dir dist --clean --external @ffmpeg-installer/ffmpeg && node scripts/stage-assets.mjs && node scripts/verify-package.mjs",
+    "build": "tsup src/cli.ts --format esm --platform node --target node22 --out-dir dist --clean && node scripts/stage-assets.mjs && node scripts/verify-package.mjs",
     "prepack": "pnpm build",
     "typecheck": "tsc --noEmit -p ../../tsconfig.json"
   },
@@ -55,9 +57,6 @@
     "quickjs-emscripten": "0.32.0",
     "semver": "7.8.5",
     "yaml": "2.9.0"
-  },
-  "optionalDependencies": {
-    "@ffmpeg-installer/ffmpeg": "1.1.0"
   },
   "devDependencies": {
     "tsup": "8.5.1"

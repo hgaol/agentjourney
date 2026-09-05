@@ -1,6 +1,10 @@
+import { spawnSync } from "node:child_process";
 import { readFile } from "node:fs/promises";
 import { expect, test, type FrameLocator, type Locator, type Page } from "@playwright/test";
 import { fixturePath } from "@agentjourney/test-fixtures";
+
+const ffmpegExecutable = process.env.AGENTJOURNEY_FFMPEG_EXECUTABLE ?? "ffmpeg";
+const systemFfmpegAvailable = spawnSync(ffmpegExecutable, ["-version"], { stdio: "ignore", windowsHide: true }).status === 0;
 
 async function selectAstryxOption(
   page: Page,
@@ -481,6 +485,7 @@ test("streams long responses without rebuilding the complete Stage", async ({ pa
 });
 
 test("exports a configurable source-native Replay as MP4", async ({ page }) => {
+  test.skip(!systemFfmpegAvailable, "A separately installed FFmpeg is required for MP4 export");
   await page.goto("/");
   await page.getByText("Read the greeting file.", { exact: true }).click();
   await page.getByRole("button", { name: "export mp4" }).click();

@@ -27,9 +27,6 @@
     "fflate": "^0.8.2",
     "playwright-core": "1.62.1"
   },
-  "optionalDependencies": {
-    "@ffmpeg-installer/ffmpeg": "1.1.0"
-  },
   "devDependencies": {
     "@agentjourney/test-fixtures": "workspace:*",
     "tsup": "^8.5.0"

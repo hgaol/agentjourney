@@ -216,9 +216,9 @@ try {
   const requireFromInstall = createRequire(path.join(installRoot, "package.json"));
   try {
     requireFromInstall.resolve("@ffmpeg-installer/ffmpeg");
-    throw new Error("Package smoke expected optional FFmpeg to be omitted");
+    throw new Error("AgentJourney must not distribute FFmpeg binaries");
   } catch (error) {
-    if (error instanceof Error && error.message === "Package smoke expected optional FFmpeg to be omitted") throw error;
+    if (error instanceof Error && error.message === "AgentJourney must not distribute FFmpeg binaries") throw error;
   }
   const sbom = run(command("npm"), ["sbom", "--package-lock-only", "--sbom-format", "cyclonedx"], { cwd: installRoot });
   JSON.parse(sbom);

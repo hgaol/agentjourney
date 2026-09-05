@@ -13,7 +13,7 @@ Implemented on 2026-09-04:
 - one-process Fastify API and production SPA serving;
 - loopback bootstrap, browser opening, port reuse, and signal shutdown;
 - private workspace bundling with lazy host initialization;
-- optional FFmpeg resolution that prefers system/configured FFmpeg and does not block startup;
+- system/configured FFmpeg resolution that does not distribute media binaries or block startup;
 - package file/size/dependency verification;
 - `npm pack`, clean install without optional dependencies, `npx`, production SPA, QuickJS, persistence, and SBOM smoke checks;
 - Linux/macOS/Windows package CI matrix and protected OIDC publish workflow.
@@ -26,9 +26,9 @@ pnpm release:verify
 
 `release:verify` deliberately uses `AGENTJOURNEY_ALLOW_PRIVATE_PACK=1` only around local `npm pack`. The publish workflow uses `release:check` plus release-mode `release:pack`, so it cannot publish while `private: true` remains.
 
-Owner-controlled release acknowledgements live in `apps/distribution/release-approvals.json`. They default to `false`; do not change them until npm package ownership and the FFmpeg distribution decision are actually confirmed. The distribution package also remains `private: true` and `UNLICENSED` as a fail-closed publication guard. `pnpm release:check` requires the owner gates, license, canonical Git metadata, and an explicit switch to `private: false`.
+Owner-controlled release acknowledgements live in `apps/distribution/release-approvals.json`. The system-only FFmpeg policy is approved; npm ownership remains false until the package name is actually claimed. AgentJourney is licensed under Apache-2.0. The distribution package remains `private: true` as the final fail-closed publication guard, and `pnpm release:check` requires npm ownership plus an explicit switch to `private: false`.
 
-The generated alpha tarball is approximately 382 KiB packed and 1.41 MiB unpacked, excluding installed runtime dependencies.
+The generated alpha tarball is approximately 387 KiB packed and 1.42 MiB unpacked, excluding installed runtime dependencies.
 
 ## Distribution decision
 
@@ -115,7 +115,7 @@ For distribution, configure the CLI/host bundle to include every `@agentjourney/
 A suitable bundling policy is:
 
 - **bundle:** all `@agentjourney/*` modules and ordinary pure-JavaScript dependencies;
-- **externalize and declare:** QuickJS/WASM packages, the selected FFmpeg integration, and Playwright browser-launching packages;
+- **externalize and declare:** QuickJS/WASM and Playwright browser-launching packages;
 - **copy:** the production Web assets;
 - **never include:** Playwright browser downloads.
 
@@ -204,7 +204,7 @@ The publishing package should start with an alpha version and explicit metadata:
   "name": "agentjourney",
   "version": "0.1.0-alpha.1",
   "description": "Local-first forensic review and replay for coding-agent histories",
-  "license": "<chosen-project-license>",
+  "license": "Apache-2.0",
   "type": "module",
   "bin": {
     "agentjourney": "dist/cli.js"
@@ -213,6 +213,7 @@ The publishing package should start with an alpha version and explicit metadata:
     "dist/**",
     "README.md",
     "LICENSE",
+    "NOTICE",
     "THIRD_PARTY_NOTICES.md"
   ],
   "engines": {
@@ -220,12 +221,12 @@ The publishing package should start with an alpha version and explicit metadata:
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/<owner>/<repository>.git"
+    "url": "git+https://github.com/hgaol/agentjourney.git"
   },
   "bugs": {
-    "url": "https://github.com/<owner>/<repository>/issues"
+    "url": "https://github.com/hgaol/agentjourney/issues"
   },
-  "homepage": "https://github.com/<owner>/<repository>#readme",
+  "homepage": "https://hgaol.github.io/agentjourney/",
   "keywords": [
     "coding-agent",
     "claude-code",
@@ -253,17 +254,11 @@ The canonical repository is `https://github.com/hgaol/agentjourney`. Package `re
 
 ## Licensing and third-party review
 
-A project `LICENSE` file is currently absent. Choosing and adding the AgentJourney license is a release blocker; dependency licenses do not license AgentJourney's own code.
+AgentJourney is licensed under Apache License 2.0. Root and npm-package copies of `LICENSE` and `NOTICE` are included so source and packed distributions carry the same terms and attribution.
 
-Generate and review `THIRD_PARTY_NOTICES.md` and a machine-readable software bill of materials for every release artifact. Pay particular attention to runtime binaries and code copied into the Web bundle.
+Generate and review `THIRD_PARTY_NOTICES.md` and a machine-readable software bill of materials for every release artifact. Pay particular attention to code copied into the Web bundle.
 
-The current FFmpeg dependency still needs an owner licensing/platform decision:
-
-- `@ffmpeg-installer/ffmpeg@1.1.0` selects platform packages through optional dependencies;
-- its Linux x64 package identifies a 2018 FFmpeg build and declares GPLv3;
-- the available package matrix does not include native Windows arm64.
-
-The technical startup gap is closed: FFmpeg is now an optional dependency, is dynamically resolved only for MP4 export, prefers `AGENTJOURNEY_FFMPEG_EXECUTABLE` and system `ffmpeg`, and can be absent without preventing archive/review startup. The clean package smoke deliberately omits optional dependencies. Before public release, the owner must still approve this fallback's license/age/platform policy or request its removal/replacement.
+AgentJourney does not distribute FFmpeg. MP4 export resolves `AGENTJOURNEY_FFMPEG_EXECUTABLE` first and then `ffmpeg` on the system `PATH`; missing FFmpeg produces a capability error only when video export is requested. Users are responsible for installing a build whose license and codecs are appropriate for their platform and use.
 
 `playwright-core` does not provide a browser installation by itself. The npm install must not silently download a browser. MP4 export should continue to discover installed Chromium, Chrome, or Edge and explain the optional Playwright browser-install command when none is available.
 
@@ -593,7 +588,7 @@ The npm registry, GitHub Releases, Sigstore, and transparency logs necessarily r
 - Bundle all private workspace modules.
 - Externalize only verified asset-bearing runtime packages.
 - Resolve QuickJS/WASM from a clean installation.
-- Make FFmpeg optional or replace the current distribution strategy.
+- Keep FFmpeg external and verify clear capability diagnostics when it is absent.
 - Add content allowlist and size budgets.
 
 ### Milestone D — Tarball verification
@@ -621,14 +616,15 @@ The npm registry, GitHub Releases, Sigstore, and transparency logs necessarily r
 
 Do not publish the first public alpha until all of these are resolved:
 
-- [ ] AgentJourney project license selected and committed; distribution package switched from `private: true`/`UNLICENSED` only after approval
+- [x] Apache-2.0 project license and NOTICE committed for source and npm distributions
+- [ ] Distribution package switched from `private: true` after npm ownership is confirmed
 - [x] Canonical Git repository metadata and local `origin` configured for `https://github.com/hgaol/agentjourney`
 - [ ] `agentjourney` npm name ownership confirmed in `release-approvals.json`
 - [x] Private workspace imports bundled out of the artifact
 - [x] Production Web UI served without Vite
 - [ ] Clean tarball install starts on Linux, macOS, and Windows (Linux passes locally; the three-OS CI gate is configured but has not yet run remotely)
 - [x] QuickJS/WASM is exercised from a packed clean installation
-- [ ] FFmpeg licensing, age, and platform coverage reviewed by the owner and approved in `release-approvals.json` (technical optionality and system fallback are implemented)
+- [x] System-only FFmpeg policy approved; no FFmpeg binary package is distributed
 - [x] Package file allowlist, dependency declaration, size, and sensitive-file checks pass
 - [x] Local auth and loopback-only binding pass from the package
 - [x] Journey and plugin data survive packaged-process restart

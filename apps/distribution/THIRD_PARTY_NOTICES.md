@@ -20,6 +20,6 @@ Key runtime and Web dependencies include:
 | TanStack Query, Router, and Virtual | MIT |
 | yaml | ISC |
 
-MP4 export may use the optional `@ffmpeg-installer/ffmpeg` platform package. The currently selected Linux x64 binary package declares GPLv3; FFmpeg and codec licensing can vary by build and platform. AgentJourney must complete a platform-specific FFmpeg licensing review before public publication.
+MP4 export invokes a separately installed FFmpeg executable discovered through `AGENTJOURNEY_FFMPEG_EXECUTABLE` or the system `PATH`. AgentJourney does not distribute FFmpeg binaries. FFmpeg and codec licensing remains the responsibility of the selected external installation.
 
-This file is a review aid, not yet a complete generated software bill of materials. The release pipeline must generate and verify the final dependency/license inventory from the packed artifact before publishing.
+This file is a review aid. The release pipeline also generates a machine-readable CycloneDX software bill of materials from the clean installed package, which is the authoritative dependency inventory for that artifact.

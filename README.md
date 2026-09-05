@@ -8,7 +8,7 @@ It passively scans approved history locations or imports selected native files. 
 
 ## Development
 
-Requirements: Node.js 22.19+ and pnpm 10+. Local MP4 export uses Playwright Chromium, installed Google Chrome or Microsoft Edge, or optional Safari-compatible Playwright WebKit. FFmpeg is resolved from `AGENTJOURNEY_FFMPEG_EXECUTABLE`, the system `PATH`, or the optional installer dependency; missing FFmpeg does not prevent archive and review startup.
+Requirements: Node.js 22.19+ and pnpm 10+. Local MP4 export uses Playwright Chromium, installed Google Chrome or Microsoft Edge, or optional Safari-compatible Playwright WebKit. FFmpeg is resolved from `AGENTJOURNEY_FFMPEG_EXECUTABLE` or the system `PATH`; AgentJourney does not distribute FFmpeg binaries, and missing FFmpeg does not prevent archive and review startup.
 
 ```bash
 pnpm install
@@ -39,7 +39,7 @@ The repository can build and exercise the single-package npm alpha locally:
 pnpm release:verify
 ```
 
-This creates an ignored tarball and CycloneDX SBOM under `release/`, installs the tarball without optional dependencies, invokes its `npx` binary, serves the embedded production SPA, exercises QuickJS Renderer and Source Adapter plugins, and verifies persistence across restart, uninstall, and reinstall. Public npm publication remains blocked until the project license, canonical Git repository, npm package ownership, and FFmpeg distribution approval are supplied.
+This creates an ignored tarball and CycloneDX SBOM under `release/`, installs the tarball without optional dependencies, invokes its `npx` binary, serves the embedded production SPA, exercises QuickJS Renderer and Source Adapter plugins, and verifies persistence across restart, uninstall, and reinstall. Public npm publication remains blocked until the npm package name is claimed/confirmed and the publishing package's fail-closed `private` guard is removed.
 
 See [Distribution and publishing](docs/distribution-and-publishing.md).
 

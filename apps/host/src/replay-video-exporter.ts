@@ -302,12 +302,6 @@ async function resolveFfmpegExecutable(): Promise<string> {
     ffmpegExecutablePromise = (async () => {
       const candidates = [process.env.AGENTJOURNEY_FFMPEG_EXECUTABLE, "ffmpeg"]
         .filter((value): value is string => Boolean(value));
-      try {
-        const installer = await import("@ffmpeg-installer/ffmpeg");
-        if (installer.default.path) candidates.push(installer.default.path);
-      } catch {
-        // The optional package is not required for archive and review features.
-      }
       for (const candidate of [...new Set(candidates)]) {
         if (await executableWorks(candidate)) return candidate;
       }
@@ -365,6 +359,7 @@ export class LocalReplayVideoExporter implements ReplayVideoExporter {
       publishProgress(input, { phase: "preparing", percent: 1, message: "Planning Replay frames" });
       temporaryDirectory = await mkdtemp(path.join(os.tmpdir(), "agentjourney-video-"));
       const plan = planReplayVideo(input.stage, input.options);
+      await resolveFfmpegExecutable();
       const quality = QUALITY[input.options.quality];
       publishProgress(input, {
         phase: "preparing",
