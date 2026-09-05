@@ -17,6 +17,14 @@
   "engines": {
     "node": ">=22.19.0"
   },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/hgaol/agentjourney.git"
+  },
+  "bugs": {
+    "url": "https://github.com/hgaol/agentjourney/issues"
+  },
+  "homepage": "https://hgaol.github.io/agentjourney/",
   "keywords": [
     "coding-agent",
     "claude-code",

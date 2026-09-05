@@ -1,5 +1,7 @@
 # AgentJourney
 
+[Website](https://hgaol.github.io/agentjourney/) · [Interactive demo](https://hgaol.github.io/agentjourney/demo/) · [GitHub](https://github.com/hgaol/agentjourney)
+
 AgentJourney is a local-only platform for preserving, reviewing, and replaying histories from Claude Code, OpenAI Codex CLI, Pi, and the standalone GitHub Copilot CLI.
 
 It passively scans approved history locations or imports selected native files. AgentJourney never launches, wraps, intercepts, or controls a coding agent. Source files remain read-only; exact Source Bundles are copied into an **unencrypted** independent archive.

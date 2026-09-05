@@ -249,7 +249,7 @@ The CLI file must begin with:
 
 Do not set `private: true` on the publishing package. Keep the monorepo root and internal workspaces private.
 
-No Git remote is currently configured in this checkout. Configure the canonical repository before publishing, and make `repository.url` match its case-sensitive GitHub location so npm provenance can link the package to the correct source.
+The canonical repository is `https://github.com/hgaol/agentjourney`. Package `repository`, `bugs`, and GitHub Pages `homepage` metadata are configured for that location; keep the local `origin` and npm provenance settings case-sensitively aligned.
 
 ## Licensing and third-party review
 
@@ -622,7 +622,7 @@ The npm registry, GitHub Releases, Sigstore, and transparency logs necessarily r
 Do not publish the first public alpha until all of these are resolved:
 
 - [ ] AgentJourney project license selected and committed; distribution package switched from `private: true`/`UNLICENSED` only after approval
-- [ ] Canonical Git remote configured
+- [x] Canonical Git repository metadata and local `origin` configured for `https://github.com/hgaol/agentjourney`
 - [ ] `agentjourney` npm name ownership confirmed in `release-approvals.json`
 - [x] Private workspace imports bundled out of the artifact
 - [x] Production Web UI served without Vite
