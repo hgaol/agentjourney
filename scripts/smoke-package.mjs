@@ -24,9 +24,9 @@ function command(name) {
 }
 
 function run(executable, args, options = {}) {
-  const result = spawnSync(executable, args, { encoding: "utf8", ...options });
-  if (result.status !== 0) {
-    throw new Error(`${executable} ${args.join(" ")} failed (${result.status ?? "unknown"})\n${result.stdout ?? ""}\n${result.stderr ?? ""}`);
+  const result = spawnSync(executable, args, { encoding: "utf8", shell: process.platform === "win32", ...options });
+  if (result.error || result.status !== 0) {
+    throw new Error(`${executable} ${args.join(" ")} failed (${result.status ?? "unknown"})${result.error ? `: ${result.error.message}` : ""}\n${result.stdout ?? ""}\n${result.stderr ?? ""}`);
   }
   return result.stdout.trim();
 }
