@@ -12,8 +12,10 @@ const manifest = JSON.parse(await readFile(path.join(workspaceRoot, "release", "
 const tarball = path.join(workspaceRoot, "release", manifest.filename);
 const temporaryRoot = await mkdtemp(path.join(os.tmpdir(), "agentjourney-package-smoke-"));
 const installRoot = path.join(temporaryRoot, "install");
+const sbomRoot = path.join(temporaryRoot, "sbom");
 const dataDirectory = path.join(temporaryRoot, "data");
 await mkdir(installRoot, { recursive: true });
+await mkdir(sbomRoot, { recursive: true });
 await writeFile(path.join(installRoot, "package.json"), "{\"name\":\"agentjourney-smoke\",\"version\":\"1.0.0\",\"private\":true}\n");
 await writeFile(path.join(installRoot, ".npmrc"), "fund=false\naudit=false\n");
 
@@ -58,9 +60,10 @@ async function waitForHealth(url, child) {
 
 async function stop(child) {
   if (child.exitCode !== null) return;
+  const exited = new Promise((resolve) => child.once("exit", resolve));
   child.kill("SIGTERM");
   await Promise.race([
-    new Promise((resolve) => child.once("exit", resolve)),
+    exited,
     new Promise((_, reject) => setTimeout(() => reject(new Error("Packaged CLI did not stop")), 10_000))
   ]);
 }
@@ -220,12 +223,18 @@ try {
   } catch (error) {
     if (error instanceof Error && error.message === "AgentJourney must not distribute FFmpeg binaries") throw error;
   }
-  const sbom = run(command("npm"), ["sbom", "--package-lock-only", "--sbom-format", "cyclonedx"], { cwd: installRoot });
-  JSON.parse(sbom);
-  await writeFile(path.join(workspaceRoot, "release", `agentjourney-${manifest.version}.cdx.json`), `${sbom}\n`);
   const installedPackageRoot = path.join(installRoot, "node_modules", "agentjourney");
   const cli = path.join(installedPackageRoot, "dist", "cli.js");
   const installedPackage = JSON.parse(await readFile(path.join(installedPackageRoot, "package.json"), "utf8"));
+  await writeFile(path.join(sbomRoot, "package.json"), `${JSON.stringify({
+    name: installedPackage.name,
+    version: installedPackage.version,
+    dependencies: installedPackage.dependencies ?? {}
+  }, null, 2)}\n`);
+  run(command("npm"), ["install", "--package-lock-only", "--ignore-scripts", "--omit=optional"], { cwd: sbomRoot });
+  const sbom = run(command("npm"), ["sbom", "--package-lock-only", "--sbom-format", "cyclonedx"], { cwd: sbomRoot });
+  JSON.parse(sbom);
+  await writeFile(path.join(workspaceRoot, "release", `agentjourney-${manifest.version}.cdx.json`), `${sbom}\n`);
   if (installedPackage.private === true) throw new Error("Packed package must not retain private=true");
   const version = run(process.execPath, [cli, "--version"]);
   if (version !== manifest.version) throw new Error(`Version mismatch: ${version} != ${manifest.version}`);

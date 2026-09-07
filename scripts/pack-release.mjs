@@ -29,12 +29,14 @@ try {
   packed = spawnSync(npm, ["pack", "--ignore-scripts", "--json", "--pack-destination", releaseDirectory], {
     cwd: packageRoot,
     encoding: "utf8",
-    stdio: ["ignore", "pipe", "inherit"]
+    shell: process.platform === "win32",
+    stdio: ["ignore", "pipe", "pipe"]
   });
 } finally {
   if (originalPackageJson) await writeFile(path.join(packageRoot, "package.json"), originalPackageJson);
 }
-if (packed.status !== 0) throw new Error(`npm pack failed (${packed.status ?? "unknown"})`);
+if (packed.error) throw new Error(`npm pack could not start: ${packed.error.message}`);
+if (packed.status !== 0) throw new Error(`npm pack failed (${packed.status ?? "unknown"})\n${packed.stderr ?? ""}`);
 const result = JSON.parse(packed.stdout)[0];
 if (!result?.filename || !Array.isArray(result.files)) throw new Error("npm pack returned an unexpected manifest");
 const paths = result.files.map((file) => file.path);
