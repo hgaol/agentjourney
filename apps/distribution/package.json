@@ -1,6 +1,6 @@
 {
   "name": "agentjourney",
-  "version": "0.1.0-alpha.1",
+  "version": "0.1.0-alpha.2",
   "private": false,
   "description": "Local-first forensic review and replay for coding-agent histories",
   "license": "Apache-2.0",
